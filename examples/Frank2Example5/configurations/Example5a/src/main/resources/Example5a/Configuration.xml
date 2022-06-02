@@ -1,0 +1,13 @@
+<Configuration
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="../FrankConfig.xsd"
+	>
+	<Adapter name="Adapter5a">
+		<Receiver name="Receiver5a">
+			<ApiListener name="Listener5a" uriPattern="service5a"/>
+		</Receiver>
+		<Pipeline>
+			<FixedResultPipe name="HelloWorld" returnString="Hello World!"/>
+		</Pipeline>
+	</Adapter>
+</Configuration>

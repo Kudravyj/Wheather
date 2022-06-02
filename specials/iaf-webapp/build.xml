@@ -1,0 +1,69 @@
+<project default="restart-iaf-webapp" xmlns:if="ant:if" xmlns:unless="ant:unless">
+	<target name="restart-iaf-webapp">
+		<property file="../../build.properties"/>
+		<property file="build.properties"/>
+		<property name="maven.projects" value=""/>
+		<property name="maven.skip.all" value="false"/>
+		<property name="maven.skip.clean" value="${maven.skip.all}"/>
+		<property name="maven.skip.tests" value="${maven.skip.all}"/>
+		<property name="maven.skip.frankdoc" value="${maven.skip.all}"/>
+		<property name="maven.skip.javadoc" value="${maven.skip.all}"/>
+		<property name="maven.skip.recompile.all" value="${maven.skip.all}"/>
+		<property name="maven.skip.source.jar" value="${maven.skip.all}"/>
+		<property name="tomcat.skip.waitfor" value="false"/>
+		<property name="maven.verbose" value="false"/>
+		<!-- Run webapp with configurations and tests from another project as it doesn't have it's own -->
+		<property name="configurations.dir" value="../../frank-runner/examples/Frank2Example1/configurations"/>
+		<property name="tests.dir" value="../../frank-runner/examples/Frank2Example1/tests"/>
+
+		<condition property="stop.exe" value="../../stop.bat" else="/bin/bash"><os family="windows"/></condition>
+		<condition property="stop.arg" value="../../stop.sh" else=""><os family="unix"/></condition>
+		<condition property="start.exe" value="../../start.bat" else="/bin/bash"><os family="windows"/></condition>
+		<condition property="start.arg" value="../../start.sh" else=""><os family="unix"/></condition>
+		<condition property="mvn.exe" value="../frank-runner/mvn.bat" else="/bin/bash"><os family="windows"/></condition>
+		<condition property="mvn.arg" value="../frank-runner/mvn.sh" else=""><os family="unix"/></condition>
+
+		<echo message="iaf-webapp: Stop Tomcat to prevent files used by maven being locked"/>
+		<exec executable="${stop.exe}" vmlauncher="false" failonerror="true">
+			<arg value="${stop.arg}"/>
+			<arg value="-Dproject.dir=iaf/webapp"/>
+			<arg value="-Dtomcat.skip.waitfor=${tomcat.skip.waitfor}"/>
+		</exec>
+
+		<echo message="iaf-webapp: Build iaf"/>
+		<exec dir="../../../iaf" executable="${mvn.exe}" vmlauncher="false" failonerror="true">
+			<arg value="${mvn.arg}" unless:blank="${mvn.arg}"/>
+			<arg value="clean" unless:true="${maven.skip.clean}"/>
+			<arg value="install"/>
+			<arg value="--projects" unless:blank="${maven.projects}"/>
+			<arg value="${maven.projects}" unless:blank="${maven.projects}"/>
+			<arg value="--also-make" unless:blank="${maven.projects}"/><!-- also make parent which pom.xml contains common dependencies -->
+			<arg value="-DskipTests" if:true="${maven.skip.tests}"/>
+			<arg value="-Pibissource,attachFrankDoc" unless:true="${maven.skip.frankdoc}"/><!-- generate Frank!Doc as some JUnit tests depend on the FrankConfig.xsd which will change in some cases when the Java code is changed. Profile ibissource seems necesssary to download frank-doc-1.1-SNAPSHOT.jar -->
+			<arg value="-Dmaven.javadoc.skip=true" if:true="${maven.skip.javadoc}"/>
+			<arg value="-Dmaven.compiler.useIncrementalCompilation=false" if:true="${maven.skip.recompile.all}"/><!-- prevent unnecessary "recompiling the module", when using an IDE the IDE will already give errors when files don't compile anymore because other files have changed (see also https://stackoverflow.com/questions/16963012/maven-compiler-recompile-all-files-instead-modified/49700942#49700942) -->
+			<arg value="-Dmaven.source.skip=true" if:true="${maven.skip.source.jar}"/>
+			<arg value="-X" if:true="${maven.verbose}"/>
+			<arg value="--settings" if:set="maven.settings.xml"/>
+			<arg value="${maven.settings.xml}" if:set="maven.settings.xml"/>
+		</exec>
+
+		<echo message="iaf-webapp: Update iaf-webapp with artifacts from local repo and start Tomcat"/>
+		<exec executable="${start.exe}" vmlauncher="false" failonerror="true">
+			<arg value="${start.arg}"/>
+			<arg value="-Dproject.dir=iaf/webapp"/>
+			<arg value="-Dmaven=true"/>
+			<arg value="-Dmaven.skip.clean=${maven.skip.clean}"/>
+			<arg value="-Dmaven.verbose=${maven.verbose}"/>
+			<!-- Folder target already present in iaf/.gitginore -->
+			<arg value="-Dproject.gitignore.skip=true"/>
+			<!-- Don't gitignore resources in webapp except javax.xml.stream.XMLInputFactory because this is the iaf-webapp artifact that should contain those resources (which are stored in git, in the src/main/webapp folder) (javax.xml.stream.XMLInputFactory is copied from src/main/resources) -->
+			<arg value="-Dwebapp.gitignore=WEB-INF/classes/META-INF/services/**"/>
+			<!-- Don't clean resources in webapp except lib folder                           because this is the iaf-webapp artifact that should contain those resources (which are stored in git, in the src/main/webapp folder) -->
+			<arg value="-Dwebapp.clean=WEB-INF/lib/**"/>
+			<!-- Run webapp with configurations and tests from another project as it doesn't have it's own -->
+			<arg value="-Dconfigurations.dir=${configurations.dir}"/>
+			<arg value="-Dtests.dir=${tests.dir}"/>
+		</exec>
+	</target>
+</project>
